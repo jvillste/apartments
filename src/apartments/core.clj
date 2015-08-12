@@ -166,21 +166,37 @@
         height 10
         total-width (+ width (* 2 margin))
         total-height (+ height (* 2 margin))]
-    (l/superimpose (drawable/->Rectangle total-width
-                                         total-height
-                                         [100 100 100 255])
-                   (l/margin margin 0 0 margin
-                             (drawable/->Rectangle (if-let [rating (:rating state)]
-                                                     (* (/ rating 100)
-                                                        width)
-                                                     0)
-                                                   height
-                                                   [200 200 0 255]))
-                   
-                   (l/center total-width total-height
-                             (drawable/->Text (str (or (:rating state) "-"))
-                                              (font/create "LiberationSans-Regular.ttf" 12)
-                                              [0 0 0 255])))))
+    (-> (l/superimpose (drawable/->Rectangle total-width
+                                             total-height
+                                             (if (:rating state)
+                                               [50 50 50 255]
+                                               [100 100 100 255]))
+                       (when (:rating state)
+                         (l/margin margin 0 0 margin
+                                   (drawable/->Rectangle (* (/ (:rating state) 100)
+                                                            width)
+                                                         height
+                                                         [200 200 0 255])))
+                       
+                       (l/center total-width total-height
+                                 (drawable/->Text (str (or (:rating state) "-"))
+                                                  (font/create "LiberationSans-Regular.ttf" 12)
+                                                  [0 0 0 255])))
+        (gui/on-mouse-clicked-with-view-context view-context
+                                                (fn [state event]
+                                                  (println event)
+                                                  (let [rating (int (min 100
+                                                                         (max 0
+                                                                              (* 100
+                                                                                 (/ (- (:local-x event) margin)
+                                                                                    width)))))
+                                                        rating (if (:shift event)
+                                                                 (* (int (/ rating 10)) 10)
+                                                                 rating)]
+                                                    (assoc state :rating rating))))
+        #_(gui/on-mouse-event :mouse-moved (fn [state event]
+                                             (println event)
+                                             state)))))
 
 (defn rating [view-context]
   {:local-state {}
@@ -188,7 +204,8 @@
 
 
 (defn view [view-context state]
-  (l/preferred (gui/call-view rating :rating {:rating 10}))
+  (l/margin 100 100 100 100
+            (l/preferred (gui/call-view rating :rating)))
   #_(l/vertically (l/horizontally (controls/button view-context
                                                    "Load"
                                                    (fn [state]
