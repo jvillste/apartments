@@ -160,6 +160,17 @@
       :default
       state)))
 
+(defn loca-x-to-rating [local-x width margin shift]
+  (let [rating (int (min 100
+                         (max 0
+                              (* 100
+                                 (/ (- local-x margin)
+                                    width)))))
+        rating (if shift
+                 (* (int (/ rating 10)) 10)
+                 rating)]
+    rating))
+
 (defn rating-view [view-context state]
   (let [margin 5
         width 200
@@ -184,19 +195,20 @@
                                                   [0 0 0 255])))
         (gui/on-mouse-clicked-with-view-context view-context
                                                 (fn [state event]
-                                                  (println event)
-                                                  (let [rating (int (min 100
-                                                                         (max 0
-                                                                              (* 100
-                                                                                 (/ (- (:local-x event) margin)
-                                                                                    width)))))
-                                                        rating (if (:shift event)
-                                                                 (* (int (/ rating 10)) 10)
-                                                                 rating)]
-                                                    (assoc state :rating rating))))
-        #_(gui/on-mouse-event :mouse-moved (fn [state event]
-                                             (println event)
-                                             state)))))
+                                                  (assoc state
+                                                         :rating
+                                                         (loca-x-to-rating (:local-x event)
+                                                                           width
+                                                                           margin
+                                                                           (:shift event)))))
+        (gui/on-mouse-event-with-view-context :mouse-dragged view-context 
+                                              (fn [state event]
+                                                (assoc state
+                                                       :rating
+                                                       (loca-x-to-rating (:local-x event)
+                                                                         width
+                                                                         margin
+                                                                         (:shift event))))))))
 
 (defn rating [view-context]
   {:local-state {}
