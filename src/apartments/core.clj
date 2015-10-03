@@ -16,7 +16,8 @@
             [hickory.core :as hickory]
             [flow-gl.tools.trace :as trace])
   (:import [java.awt Desktop]
-           [java.net URI]))
+           [java.net URI])
+  (:use [clojure.test]))
 
 (defn find-term
   ([term hickup]
@@ -27,9 +28,7 @@
           index 0]
      (when-let [element (first hickup)]
        (let [new-path (conj path index)]
-         (cond (and (string? element)
-                    (.contains element term)
-                    path)
+         (cond (= element term)
                new-path
 
                (vector? element)
@@ -64,8 +63,11 @@
                (inc term-index))
         values))))
 
+(defn get-hickup [url]
+  (into [] (hickory/as-hiccup (hickory/parse (:body (http/get url))))) )
+
 (defn get-data [url]
-  (let [hickup (into [] (hickory/as-hiccup (hickory/parse (:body (http/get url)))))]
+  (let [hickup (get-hickup url)]
     
     (conj (get-section hickup "Perustiedot")
           (get-section hickup "Hintatiedot ja muut kustannukset")
@@ -73,16 +75,7 @@
 
 
 
-(def urls ["http://asunnot.oikotie.fi/myytavat-asunnot/9516987" 
-           "http://asunnot.oikotie.fi/myytavat-asunnot/9559356"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/9399180"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/8460173"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/9266493"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/9511383"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/9507207"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/8556783"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/9520785"
-           "http://asunnot.oikotie.fi/myytavat-asunnot/9510894"])
+
 
 (defonce data (atom {}))
 
@@ -276,3 +269,5 @@
 
 
 (gui/redraw-last-started-view)
+
+(run-tests)
