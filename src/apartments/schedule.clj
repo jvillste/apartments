@@ -8,7 +8,11 @@
 (def urls ["http://www.etuovi.com/kohde/9466019"
            "http://www.etuovi.com/kohde/492541"
            "http://www.etuovi.com/kohde/9999914"
-           "http://www.etuovi.com/kohde/533694"])
+           "http://www.etuovi.com/kohde/533694"
+           "http://www.etuovi.com/kohde/9596073"
+           "http://www.etuovi.com/kohde/493617"
+           "http://www.etuovi.com/kohde/493548"
+           "http://www.etuovi.com/kohde/9694964"])
 
 
 (defn get-time [show-time]
@@ -66,7 +70,7 @@
       (println (get-time (:show-time url-data)))
       (println url)
       (println (get-address (:address url-data)))
-      (println))))
+      (println "\n"))))
 
 (load-data)
 (print-schedule)
