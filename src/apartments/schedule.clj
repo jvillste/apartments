@@ -5,7 +5,7 @@
 
 
 
-(def urls ["http://www.etuovi.com/kohde/9466019"
+#_(def urls ["http://www.etuovi.com/kohde/9466019"
            "http://www.etuovi.com/kohde/492541"
            "http://www.etuovi.com/kohde/9999914"
            "http://www.etuovi.com/kohde/533694"
@@ -14,43 +14,27 @@
            "http://www.etuovi.com/kohde/493548"
            "http://www.etuovi.com/kohde/9694964"])
 
+#_(def urls ["http://www.etuovi.com/kohde/c23273"
+           "http://www.etuovi.com/kohde/9636648"
+           "http://www.etuovi.com/kohde/9744457"
+           "http://www.etuovi.com/kohde/7653981"
+           "http://www.etuovi.com/kohde/9864164"
+           "http://www.etuovi.com/kohde/7199361"])
 
-(defn get-time [show-time]
-  (-> show-time
-      (clojure.string/split #" ")
-      (nth 2)))
-
-(defn get-etuovi-show-time [hickup]
-  (let [section-path (core/find-term  "Esittely" hickup)]
-    (get-in hickup
-            (-> section-path
-                (core/navigate 3 [5 3 2])))))
+(def urls ["http://www.etuovi.com/kohde/9517941"])
 
 
-(defn get-address [show-time]
-  (->> (clojure.string/split show-time #", ")
-       (drop 2)
-       (interpose ", ")
-       (apply str)))
+#_(defonce hickup (core/get-hickup "http://www.etuovi.com/kohde/9999914"))
 
-(defn get-etuovi-address [hickup]
-  (let [section-path (core/find-term {:id "reference_number"} hickup)]
-    (get-in hickup
-            (-> section-path
-                #_(core/navigate 1 [3 5 5 3 2])
-                (core/navigate 3 [5 3 2])))))
-
-(defonce hickup (core/get-hickup "http://www.etuovi.com/kohde/9999914"))
-
-(deftest get-test
+#_(deftest get-test
   (is (= ""
          (get-etuovi-address hickup))))
 
 (defn get-data [url]
   (let [hickup (core/get-hickup url)]
     {:url url
-     :show-time (get-etuovi-show-time hickup)
-     :address (get-etuovi-address hickup)}))
+     :show-time (core/get-etuovi-show-time hickup)
+     :address (core/get-etuovi-address hickup)}))
 
 (defonce data (atom {}))
 

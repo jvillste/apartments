@@ -63,6 +63,31 @@
                (inc term-index))
         values))))
 
+(defn get-time [show-time]
+  (-> show-time
+      (clojure.string/split #" ")
+      (nth 2)))
+
+(defn get-etuovi-show-time [hickup]
+  (let [section-path (find-term  "Esittely" hickup)]
+    (get-in hickup
+            (-> section-path
+                (navigate 3 [5 3 2])))))
+
+
+(defn get-address [show-time]
+  (->> (clojure.string/split show-time #", ")
+       (drop 2)
+       (interpose ", ")
+       (apply str)))
+
+(defn get-etuovi-address [hickup]
+  (let [section-path (find-term {:id "reference_number"} hickup)]
+    (get-in hickup
+            (-> section-path
+                (navigate 3 [5 3 2])))))
+
+
 (defn get-hickup [url]
   (into [] (hickory/as-hiccup (hickory/parse (:body (http/get url))))) )
 
@@ -81,7 +106,7 @@
 
 
 
-(defn load-data []
+(defn load-data [urls]
   (reset! data (reduce (fn [data url]
                          (if (not (contains? data url))
                            (assoc data url (get-data url))
@@ -263,11 +288,10 @@
    :view #'view})
 
 (defn start []
-  (.start (Thread. (fn []
-                     (gui/start-control apartments)))))
+  (gui/start-control apartments))
 
 
 
-(gui/redraw-last-started-view)
+#_(gui/redraw-last-started-view)
 
 (run-tests)
