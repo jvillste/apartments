@@ -1,19 +1,22 @@
 (ns apartments.lots
-  (:require [apartments.core :as core]
+  (:require (apartments [core :as core]
+                        [data :as data])
             [clojure.string :as string]
+            [datomic.api :as d]
             [flow-gl.tools.trace :as trace])
   (:use [clojure.test]))
+
+(def test-query "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128&page=9")
 
 (def query-url-base "http://www.etuovi.com/myytavat-tontit/")
 (def query-url "tulokset?haku=M100905128")
 
 (def lot-url-base "http://www.etuovi.com/kohde/")
 
-(defonce hickup (core/get-hickup query-url))
+(defonce hickup (core/get-hickup "http://www.etuovi.com/kohde/1165909"))
 
-#_(deftest get-test
-    (is (= ""
-           (get-etuovi-address hickup))))
+(defn get-lot-hickup [id]
+  (core/get-hickup (str lot-url-base id)))
 
 (defn get-etuovi-lot-ids [hickup]
   (let [result-list-path (core/find-term {:class "results list"} hickup)
@@ -34,7 +37,6 @@
 (defn get-all-etuovi-lot-ids [query-url]
   (loop [url query-url
          ids []]
-    (println "getting " url)
     (Thread/sleep 1000)
     (let [hickup (core/get-hickup (str query-url-base url))
           next-url (next-url hickup)
@@ -44,32 +46,39 @@
                ids)
         ids))))
 
-(defn get-etuovi-data [url]
-  (let [hickup (core/get-hickup url)]
-    {:url url
-     :address (core/get-etuovi-address hickup)}))
+(defn get-etuovi-address [hickup]
+  (let [path (core/find-term [:dt {} "Sijainti:"] hickup)]
+    (get-in hickup
+            (-> path
+                (core/navigate 1 [9 3 5 2 2])))))
 
-(defonce data (atom {}))
+(defn see [conn id]
+  (d/transact conn (data/seen id)))
 
-#_(defn load-data []
-    (reset! data (reduce (fn [data url]
-                           (if (not (contains? data url))
-                             (assoc data url (get-data url))
-                             data))
-                         @data
-                         urls)))
+(defn add-missing-data [conn id]
+  (let [db (d/db conn)]
+    (if (not (data/value db
+                         (data/apartment-by-id db id)
+                         :apartments/address))
+      (d/transact conn (data/set-for-apartment id
+                                               :apartments/address
+                                               (get-etuovi-address (get-lot-hickup id)))))))
 
-#_(defn print-schedule []
-    (doseq [url urls]
-      (let [url-data (get @data url)]
-        (println (get-time (:show-time url-data)))
-        (println url)
-        (println (get-address (:address url-data)))
-        (println "\n"))))
+(defn update-data []
+  (let [ids (get-all-etuovi-lot-ids test-query)
+        conn (d/connect data/db-uri)]
+    (doseq [id ids]
+      (println id)
+      (see conn id)
+      (add-missing-data conn id))))
 
-#_(load-data)
-#_(print-schedule)
+(defn get-apartment-entities [conn]
+  (let [db (d/db conn)]
+    (map #(d/entity db %)
+         (data/apartment-entities db))))
 
-#_(run-tests)
+
+
+
 
 
