@@ -21,7 +21,10 @@
            "http://www.etuovi.com/kohde/9864164"
            "http://www.etuovi.com/kohde/7199361"])
 
-(def urls ["http://www.etuovi.com/kohde/9517941"])
+#_(def urls ["http://www.etuovi.com/kohde/9517941"])
+
+;; 4.12.2015
+(def urls ["http://www.etuovi.com/kohde/9795904"])
 
 
 #_(defonce hickup (core/get-hickup "http://www.etuovi.com/kohde/9999914"))
@@ -51,9 +54,9 @@
 (defn print-schedule []
   (doseq [url urls]
     (let [url-data (get @data url)]
-      (println (get-time (:show-time url-data)))
+      (println (core/get-time (:show-time url-data)))
       (println url)
-      (println (get-address (:address url-data)))
+      (println (core/get-address (:address url-data)))
       (println "\n"))))
 
 (load-data)

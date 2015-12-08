@@ -20,28 +20,48 @@
          (assoc :db/fulltext true)))))
 
 (def schema [(attribute :apartments/id :string :one :identity true)
-             (attribute :apartments/last-seen :instant)
-             (attribute :apartments/address :string)])
+             (attribute :apartments/first-seen :instant)
+             (attribute :apartments/not-seen :instant)
+             (attribute :apartments/address :string)
+             (attribute :apartments/area :long)
+             (attribute :apartments/price :long)
+             (attribute :apartments/comment :string)])
 
-(def migrations {:add-comment
-                 {:txes [[(attribute :apartments/comment :string)]]}})
+(def migrations {} #_{:add-comment
+                      {:txes [[]]}})
 
+(def memory-db-uri "datomic:mem://apartments")
 
-(def db-uri #_"datomic:mem://apartments" "datomic:free://localhost:4334/apartments")
+(def db-uri "datomic:free://localhost:4334/apartments")
 
 (defn migrate [db-uri migrations]
   (let [conn (d/connect db-uri)]
     (conformity/ensure-conforms conn
                                 migrations)))
 
-
 (defn create-apartments-database [uri]
   (d/create-database db-uri)
   (let [conn (d/connect db-uri)]
     (d/transact conn schema)))
 
+
+(defn create-new-in-memory-apartments-database []
+  (let [db-uri (str "datomic:mem://" (int (rand 100000)))]
+    (create-apartments-database db-uri)
+    db-uri))
+
 ;; queries
 
+(defn db-attributes [db]
+  (d/q '[:find ?ident ?valueType
+         :in $
+         :where
+         [?entity :db/ident ?ident]
+         [?entity :db/valueType ?valueTypeId]
+         [?valueTypeId :db/ident ?valueType]]
+       db
+       attribute
+       value))
 
 (defn entity-by-value [db attribute value]
   (d/q '[:find ?entity .
@@ -95,11 +115,18 @@
                    :apartments/id
                    id))
 
-(defn apartment-entities [db]
+(defn apartment-entity-ids [db]
   (d/q '[:find [?entity ...]
          :in $ 
          :where
          [?entity :apartments/id ?_]]
+       db))
+
+(defn apartment-ids [db]
+  (d/q '[:find [?id ...]
+         :in $ 
+         :where
+         [?_ :apartments/id ?id]]
        db))
 
 ;; adding
@@ -112,8 +139,12 @@
     :apartments/id id
     attribute value}])
 
-(defn seen [id]
-  (set-for-apartment id :apartments/last-seen (java.util.Date.)))
+(defn first-seen-now [id]
+  (set-for-apartment id :apartments/first-seen (java.util.Date.)))
+
+(defn not-seen-now [id]
+  (set-for-apartment id :apartments/not-seen (java.util.Date.)))
+
 
 
 
@@ -160,17 +191,39 @@
   (d/delete-database db-uri) 
   (create-apartments-database db-uri))
 
+(defn get-apartment-entities [conn]
+  (let [db (d/db conn)]
+    (map #(d/entity db %)
+         (apartment-entity-ids db))))
+
 #_(create-apartments-database db-uri)
+
+#_(d/delete-database db-uri)
+
+#_(reset-apartments-database)
 
 #_(let [conn (d/connect db-uri)]
     (d/transact conn (concat (seen "123")
                              (set-for-apartment "123" :apartments/address "Address 1"))))
 
 #_(let [conn (d/connect db-uri)]
-    (let [db (d/db conn)
-          entity (d/entity db
-                           (apartment-by-id db "123"))]
-      (select-keys entity [:apartments/last-seen
-                           :apartments/address])))
+  (let [db (d/db conn)
+        entity (d/entity db
+                         (apartment-by-id db "123"))]
+    (select-keys entity [:apartments/last-seen
+                         :apartments/address])))
+
+#_(let [conn (d/connect db-uri)]
+    (d/transact conn schema))
+
+#_(let [conn (d/connect db-uri)]
+  (db-attributes (d/db conn)))
+
+(-> db-uri
+    d/connect
+    d/db
+    apartment-ids)
+
 
 #_(migrate db-uri migrations)
+

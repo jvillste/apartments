@@ -48,17 +48,17 @@
     (assoc state
            :changes changes
            :db-with-changes (:db-after result)
-           :ids-to-tempids-map (ids-to-tempids (:db-after result)
-                                               (:tempids result)
-                                               (tempids changes)))))
+           :ids-to-tempids-map (data/ids-to-tempids (:db-after result)
+                                                    (:tempids result)
+                                                    (data/tempids changes)))))
 
 (defn attribute-editor [view-context state entity-id attribute]
-  (let [old-value (value (:db state)
-                         entity-id
-                         attribute)
-        new-value (value (:db-with-changes state)
-                         entity-id
-                         attribute)
+  (let [old-value (data/value (:db state)
+                              entity-id
+                              attribute)
+        new-value (data/value (:db-with-changes state)
+                              entity-id
+                              attribute)
         changed-value-key [entity-id attribute]]
     (l/horizontally (-> (gui/call-view controls/text-editor [:editor changed-value-key])
                         (update-in [:state-overrides]
@@ -71,12 +71,12 @@
                                                                view-context
                                                                (fn [state]
                                                                  (set-changes state
-                                                                              (set-attribute-value (:changes state)
-                                                                                                   (or (get (:ids-to-tempids-map state)
+                                                                              (data/set-attribute-value (:changes state)
+                                                                                                        (or (get (:ids-to-tempids-map state)
+                                                                                                                 entity-id)
                                                                                                             entity-id)
-                                                                                                       entity-id)
-                                                                                                   attribute
-                                                                                                   new-value)))))))
+                                                                                                        attribute
+                                                                                                        new-value)))))))
                     (when (not= old-value new-value)
                       (text "*" [255 0 0 255] 30)))))
 
@@ -96,7 +96,7 @@
   
   (l/vertically
 
-   (let [entities (lots/get-apartment-entities (:conn state))]
+   (let [entities (data/get-apartment-entities (:conn state))]
      (l/horizontally (l/vertically (for [entity entities]
                                      (-> (cell (text (:apartments/address entity)))
                                          (gui/on-mouse-clicked (fn [state event]

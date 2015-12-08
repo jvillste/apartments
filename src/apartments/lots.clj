@@ -3,6 +3,7 @@
                         [data :as data])
             [clojure.string :as string]
             [datomic.api :as d]
+            [clojure.set :as set]
             [flow-gl.tools.trace :as trace])
   (:use [clojure.test]))
 
@@ -52,33 +53,76 @@
             (-> path
                 (core/navigate 1 [9 3 5 2 2])))))
 
-(defn see [conn id]
-  (d/transact conn (data/seen id)))
+(defn get-apartment-data [apartment-id]
+  (let [hickup (get-lot-hickup apartment-id)]
+    {:apartments/address (get-etuovi-address hickup)}))
 
-(defn add-missing-data [conn id]
-  (let [db (d/db conn)]
-    (if (not (data/value db
-                         (data/apartment-by-id db id)
-                         :apartments/address))
-      (d/transact conn (data/set-for-apartment id
-                                               :apartments/address
-                                               (get-etuovi-address (get-lot-hickup id)))))))
+(defn set-new-apartments-data [apartment-data-map]
+  [(assoc apartment-data-map
+          :db/id (data/new-id)
+          :apartments/first-seen (java.util.Date.))])
 
-(defn update-data []
-  (let [ids (get-all-etuovi-lot-ids test-query)
-        conn (d/connect data/db-uri)]
-    (doseq [id ids]
-      (println id)
-      (see conn id)
-      (add-missing-data conn id))))
+(defn new-ids [old-ids current-ids]
+  (set/difference (apply hash-set current-ids)
+                  (apply hash-set old-ids)))
 
-(defn get-apartment-entities [conn]
-  (let [db (d/db conn)]
-    (map #(d/entity db %)
-         (data/apartment-entities db))))
+(defn removed-ids [old-ids current-ids]
+  (set/difference (apply hash-set old-ids)
+                  (apply hash-set current-ids)))
 
 
+(defn load-data [ids]
+  (->> ids
+       (map get-apartment-data)
+       (map set-new-apartments-data)))
 
+(defn refresh-data [conn current-ids]
+  (let [db (d/db conn)
+        old-ids (data/apartment-ids db)]
+    (d/transact conn
+                (load-data (new-ids old-ids
+                                    current-ids)))))
 
+(defn mark-not-seen [ids]
+  (map data/not-seen-now ids))
 
+;; sample data
 
+(defn int-rand [from to step]
+  (* step (int (/ (+ from
+                     (int (rand (- to from))))
+                  step))))
+
+(defn sample-apartment [id]
+  {:apartments/id id
+   :apartments/address (str "address " id)
+   :apartments/comment (str "comment " id)
+   :apartments/price (int-rand 80000 150000 1000)
+   :apartments/area (int-rand 500 2500 10)})
+
+;; test
+
+(def db-uri "datomic:free://localhost:4334/apartments")
+
+#_(data/create-apartments-database db-uri)
+
+#_(let [conn (d/connect db-uri)]
+    (refresh-data conn (get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128&page=9")))
+
+(let [conn (d/connect db-uri)]
+  (refresh-data conn #{"7663526" "7663600"}))
+
+(get-apartment-data "7663526")
+
+#_(let [;conn (d/connect (data/create-new-in-memory-apartments-database))
+        data (map sample-apartment (range 1 3))
+        new-data (map sample-apartment (range 2 4))]
+    (clojure.pprint/pprint (map set-new-apartments-data data)))
+
+#_(def ids (get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128&page=9"))
+
+#_(removed-ids ids
+               (-> db-uri
+                   d/connect
+                   d/db
+                   data/apartment-ids))

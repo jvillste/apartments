@@ -47,10 +47,36 @@
                                  path)
                            [5 2]))))
 
+
 (defn navigate [path back-steps forward-steps]
   (concat (take (- (count path) back-steps)
                 path)
           forward-steps))
+
+(defn clean-value [value]
+  (->> (flatten value)
+       (filter string?)
+       (map #(.trim %))
+       (filter #(not= "" %))
+       (interpose " ")
+       (apply str)))
+
+(defn get-etuovi-section [page-hickup section-name]
+  (if-let [path (find-term section-name page-hickup)]
+    (let [section-hickup (as-> path x
+                           (navigate x 3 [])
+                           (get-in page-hickup x))]
+      (as-> section-hickup x
+        (find-term :dl x)
+        (navigate x 1 [])
+        (get-in section-hickup x)
+        (->> x
+             (filter #(and (vector? %)
+                           (#{:dd :dt} (first %))))
+             (map clean-value)
+             (apply hash-map))))
+    {}))
+
 
 (defn get-section [hickup section-name]
   (let [section-path (find-term section-name hickup)]
@@ -91,7 +117,7 @@
 (defn get-hickup [url]
   (into [] (hickory/as-hiccup (hickory/parse (:body (http/get url))))) )
 
-(defn get-data [url]
+(defn get-oikotie-data [url]
   (let [hickup (get-hickup url)]
     
     (conj (get-section hickup "Perustiedot")
@@ -99,199 +125,31 @@
           (get-section hickup "Talon ja tontin tiedot"))))
 
 
+(defn get-sections [hickup get-section & section-names]
+  (reduce conj
+          {}
+          (map #(get-section hickup %)
+               section-names)))
+
+(defn get-etuovi-lot-data [hickup]
+  (get-sections hickup
+                get-etuovi-section
+                "Kohteen perustiedot"
+                "Hinta ja kustannukset"
+                "Kohteen lisätiedot"
+                "Tontti ja kaavoitus"))
 
 
 
-(defonce data (atom {}))
+;; test
 
 
+#_(def hickup (get-hickup "http://www.etuovi.com/kohde/9511178"))
 
-(defn load-data [urls]
-  (reset! data (reduce (fn [data url]
-                         (if (not (contains? data url))
-                           (assoc data url (get-data url))
-                           data))
-                       @data
-                       urls)))
+#_(get-etuovi-section hickup "Tontti ja kaavoitus")
 
+#_(get-etuovi-lot-data hickup)
 
+#_(get-etuovi-section hickup "Kohteen perustiedot")
 
-(comment
-
-  
-  (println (get (get-data "http://asunnot.oikotie.fi/myytavat-asunnot/9559356")
-                "Sijainti"))
-
-
-  (http/get "http://asunnot.oikotie.fi/myytavat-asunnot/9559356")
-  
-  (def path (find-term "Perustiedot" hickup))
-
-  (trace/inspect-value (get-in hickup (take (- (count path) 2)
-                                            path)))
-  (def data [{} [[:bar "Bar"] "foo"]])
-
-  (find-term "fo" data)
-
-  (get-in data [1 1]))
-
-;;; GUI
-
-
-(defn text
-  ([value]
-   (text value [255 255 255 255]))
-
-  ([value color]
-   (drawable/->Text (str value)
-                    (font/create "LiberationSans-Regular.ttf" 15)
-                    color)))
-
-(defn do-async [view-context task finish]
-  (let [data-channel (async/thread (task))]
-    (async/go (let [data (async/<! data-channel)]
-                (gui/apply-to-state view-context (fn [state]
-                                                   (finish state data)))))))
-
-
-(defn cells [apartment & keys]
-  (for [key keys]
-    (l/margin 3 3 3 3 (text (get apartment key)))))
-
-(defn create-text-editor-keyboard-event-handler [view-context]
-  (fn [state event]
-    (cond
-      (events/key-pressed? event :back-space)
-      (gui/update-binding state
-                          view-context
-                          (fn [text] (apply str (drop-last text)))
-                          :text)
-
-      (and (:character event)
-           (= (:type event)
-              :key-pressed))
-      (gui/update-binding state
-                          view-context
-                          #(str % (:character event))
-                          :text)
-
-      :default
-      state)))
-
-(defn loca-x-to-rating [local-x width margin shift]
-  (let [rating (int (min 100
-                         (max 0
-                              (* 100
-                                 (/ (- local-x margin)
-                                    width)))))
-        rating (if shift
-                 (* (int (/ rating 10)) 10)
-                 rating)]
-    rating))
-
-(defn rating-view [view-context state]
-  (let [margin 5
-        width 200
-        height 10
-        total-width (+ width (* 2 margin))
-        total-height (+ height (* 2 margin))]
-    (-> (l/superimpose (drawable/->Rectangle total-width
-                                             total-height
-                                             (if (:rating state)
-                                               [50 50 50 255]
-                                               [100 100 100 255]))
-                       (when (:rating state)
-                         (l/margin margin 0 0 margin
-                                   (drawable/->Rectangle (* (/ (:rating state) 100)
-                                                            width)
-                                                         height
-                                                         [200 200 0 255])))
-                       
-                       (l/center total-width total-height
-                                 (drawable/->Text (str (or (:rating state) "-"))
-                                                  (font/create "LiberationSans-Regular.ttf" 12)
-                                                  [0 0 0 255])))
-        (gui/on-mouse-clicked-with-view-context view-context
-                                                (fn [state event]
-                                                  (assoc state
-                                                         :rating
-                                                         (loca-x-to-rating (:local-x event)
-                                                                           width
-                                                                           margin
-                                                                           (:shift event)))))
-        (gui/on-mouse-event-with-view-context :mouse-dragged view-context 
-                                              (fn [state event]
-                                                (assoc state
-                                                       :rating
-                                                       (loca-x-to-rating (:local-x event)
-                                                                         width
-                                                                         margin
-                                                                         (:shift event))))))))
-
-(defn rating [view-context]
-  {:local-state {}
-   :view #'rating-view})
-
-
-(defn view [view-context state]
-  (l/margin 100 100 100 100
-            (l/preferred (gui/call-view rating :rating)))
-  #_(l/vertically (l/horizontally (controls/button view-context
-                                                   "Load"
-                                                   (fn [state]
-                                                     (let [data-channel (async/thread (load-data))]
-                                                       (async/go (let [data (async/<! data-channel)]
-                                                                   (gui/apply-to-state view-context (fn [state]
-                                                                                                      (assoc state
-                                                                                                             :loading false
-                                                                                                             :data data)))))
-                                                       (assoc state :loading true))))
-                                  (controls/button view-context
-                                                   "Save"
-                                                   (fn [state]
-                                                     (do-async view-context
-                                                               (fn []
-                                                                 (Thread/sleep 1000)
-                                                                 (spit "data.clj" @data)
-                                                                 :result)
-                                                               (fn [state result]
-                                                                 (assoc state :saving false)))
-                                                     
-                                                     (assoc state :saving true)))
-                                  
-                                  (controls/button view-context
-                                                   "Load from disk"
-                                                   (fn [state]
-                                                     (reset! data (slurp  "data.clj"))
-                                                     (assoc state :data @data)))
-                                  
-                                  (when (:loading state) (text "Loading"))
-                                  (when (:saving state) (text "Saving")))
-                  
-                  (layouts/grid (for [[url apartment] (:data state)]
-                                  (concat [(-> (text (str (get apartment "Sijainti")))
-                                               (gui/on-mouse-clicked (fn [state event]
-                                                                       (.browse (Desktop/getDesktop)
-                                                                                (URI. url))
-                                                                       state)))
-                                           (text (str (get apartment "Kattomateriaali")))
-                                           (text (str (get apartment "Velaton hinta")))
-                                           (text (str (get apartment "Tontin pinta-ala")))]
-                                          [(text "haa")]
-                                          (cells "Lämmitys"))))))
-
-
-
-
-(defn apartments [view-context]
-  {:local-state {:data @data}
-   :view #'view})
-
-(defn start []
-  (gui/start-control apartments))
-
-
-
-#_(gui/redraw-last-started-view)
-
-(run-tests)
+#_(get-data "http://asunnot.oikotie.fi/myytavat-tontit/10855056")
