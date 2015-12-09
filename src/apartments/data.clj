@@ -196,6 +196,12 @@
     (map #(d/entity db %)
          (apartment-entity-ids db))))
 
+
+(defn raw-data-to-apartments-data [raw-data & keys]
+  (reduce (fn [data [key raw-key]]
+            (assoc data key (get raw-data raw-key)))
+          {}
+          (partition 2 keys)))
 #_(create-apartments-database db-uri)
 
 #_(d/delete-database db-uri)
@@ -207,19 +213,19 @@
                              (set-for-apartment "123" :apartments/address "Address 1"))))
 
 #_(let [conn (d/connect db-uri)]
-  (let [db (d/db conn)
-        entity (d/entity db
-                         (apartment-by-id db "123"))]
-    (select-keys entity [:apartments/last-seen
-                         :apartments/address])))
+    (let [db (d/db conn)
+          entity (d/entity db
+                           (apartment-by-id db "123"))]
+      (select-keys entity [:apartments/last-seen
+                           :apartments/address])))
 
 #_(let [conn (d/connect db-uri)]
     (d/transact conn schema))
 
 #_(let [conn (d/connect db-uri)]
-  (db-attributes (d/db conn)))
+    (db-attributes (d/db conn)))
 
-(-> db-uri
+#_(-> db-uri
     d/connect
     d/db
     apartment-ids)

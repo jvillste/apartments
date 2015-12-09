@@ -1,6 +1,7 @@
 (ns apartments.lots
   (:require (apartments [core :as core]
-                        [data :as data])
+                        [data :as data]
+                        [etuovi :as etuovi])
             [clojure.string :as string]
             [datomic.api :as d]
             [clojure.set :as set]
@@ -19,33 +20,6 @@
 (defn get-lot-hickup [id]
   (core/get-hickup (str lot-url-base id)))
 
-(defn get-etuovi-lot-ids [hickup]
-  (let [result-list-path (core/find-term {:class "results list"} hickup)
-        result-list (get-in hickup
-                            (-> result-list-path
-                                (core/navigate 1 [21])))]
-    (->> (map #(when (vector? %)
-                 (-> % second :id))
-              result-list)
-         (filter identity))))
-
-(defn next-url [hickup]
-  (let [span-path (core/find-term "Seuraava" hickup)]
-    (get-in hickup
-            (-> span-path
-                (core/navigate 2 [1 :href])))))
-
-(defn get-all-etuovi-lot-ids [query-url]
-  (loop [url query-url
-         ids []]
-    (Thread/sleep 1000)
-    (let [hickup (core/get-hickup (str query-url-base url))
-          next-url (next-url hickup)
-          ids (concat ids (get-etuovi-lot-ids hickup))]
-      (if next-url
-        (recur next-url
-               ids)
-        ids))))
 
 (defn get-etuovi-address [hickup]
   (let [path (core/find-term [:dt {} "Sijainti:"] hickup)]
@@ -53,9 +27,27 @@
             (-> path
                 (core/navigate 1 [9 3 5 2 2])))))
 
-(defn get-apartment-data [apartment-id]
-  (let [hickup (get-lot-hickup apartment-id)]
-    {:apartments/address (get-etuovi-address hickup)}))
+
+
+
+(defn clean-number [value]
+  (->> (take-while #(re-find #"[0-9 ]" (str %)) value)
+       (filter #(not= \  %))
+       (apply str)
+       (read-string)
+       (int)))
+
+(defn etuovi-raw-data-to-apartments-data [raw-data]
+  (-> (data/raw-data-to-apartments-data raw-data
+                                        :apartments/id "Kohdenumero:"
+                                        :apartments/address "Sijainti:"
+                                        :apartments/area "Tontin pinta-ala:"
+                                        :apartments/price "Myyntihinta:")
+      (update-in [:apartments/area] clean-number)
+      (update-in [:apartments/price] clean-number)))
+
+(defn get-lot-data [lot-id]
+  (etuovi-raw-data-to-apartments-data (etuovi/get-lot-data (get-lot-hickup lot-id))))
 
 (defn set-new-apartments-data [apartment-data-map]
   [(assoc apartment-data-map
@@ -73,15 +65,16 @@
 
 (defn load-data [ids]
   (->> ids
-       (map get-apartment-data)
+       (map get-lot-data)
        (map set-new-apartments-data)))
 
 (defn refresh-data [conn current-ids]
   (let [db (d/db conn)
         old-ids (data/apartment-ids db)]
     (d/transact conn
-                (load-data (new-ids old-ids
-                                    current-ids)))))
+                (flatten
+                 (load-data (new-ids old-ids
+                                     current-ids))))))
 
 (defn mark-not-seen [ids]
   (map data/not-seen-now ids))
@@ -104,15 +97,17 @@
 
 (def db-uri "datomic:free://localhost:4334/apartments")
 
+#_(def raw-data (etuovi/get-lot-data (get-lot-hickup "1165909")))
+
 #_(data/create-apartments-database db-uri)
 
 #_(let [conn (d/connect db-uri)]
-    (refresh-data conn (get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128&page=9")))
+  (refresh-data conn (get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128&page=9")))
 
-(let [conn (d/connect db-uri)]
-  (refresh-data conn #{"7663526" "7663600"}))
+#_(let [conn (d/connect db-uri)]
+    (refresh-data conn #{"7663526" "7663600"}))
 
-(get-apartment-data "7663526")
+#_(flatten (load-data ["7663526"]))
 
 #_(let [;conn (d/connect (data/create-new-in-memory-apartments-database))
         data (map sample-apartment (range 1 3))
@@ -126,3 +121,8 @@
                    d/connect
                    d/db
                    data/apartment-ids))
+
+#_(etuovi-raw-data-to-apartments-data raw-data)
+
+#_(let [conn (d/connect db-uri)]
+    (data/apartment-ids (d/db conn)))
