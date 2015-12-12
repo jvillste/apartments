@@ -89,45 +89,50 @@
       (set-changes (:changes state))))
 
 (defn cell [content]
-  (let [margin 5 ]
-    (l/minimum-size 0 23 (l/margin margin margin margin margin content))))
+  (let [margin 5]
+    (l/margin margin margin margin margin content)))
+
+
+
 
 (defn root-view [view-context state]
-  
-  (l/vertically
+  (l/float-top (l/horizontally (-> (button "Save")
+                                   (gui/on-mouse-clicked-with-view-context view-context
+                                                                           (fn [state event]
+                                                                             (d/transact (:conn state)
+                                                                                         (:changes state))
+                                                                             (-> state
+                                                                                 (assoc :db (d/db (:conn state)))
+                                                                                 (set-changes [])))))
+                               
+                               (-> (button "Refresh")
+                                   (gui/on-mouse-clicked-with-view-context view-context
+                                                                           (fn [state event]
+                                                                             (refresh state))))
 
-   (let [entities (data/get-apartment-entities (:conn state))]
-     (l/horizontally (l/vertically (for [entity entities]
-                                     (-> (cell (text (:apartments/address entity)))
-                                         (gui/on-mouse-clicked (fn [state event]
-                                                                 (.browse (Desktop/getDesktop)
-                                                                          (URI. (str lots/lot-url-base (:apartments/id entity))))
-                                                                 state)))))
-                     (l/vertically (for [entity entities]
-                                     (cell (attribute-editor view-context
-                                                             state
-                                                             (:db/id entity)
-                                                             :apartments/comment))))))
-   
-   
+                               (-> (button "Cancel")
+                                   (gui/on-mouse-clicked-with-view-context view-context
+                                                                           (fn [state event]
+                                                                             (set-changes state [])))))
+               
+               (l/vertically
 
-   (-> (button "Save")
-       (gui/on-mouse-clicked-with-view-context view-context
-                                               (fn [state event]
-                                                 (d/transact (:conn state)
-                                                             (:changes state))
-                                                 (-> state
-                                                     (assoc :db (d/db (:conn state)))
-                                                     (set-changes [])))))
-   (-> (button "Refresh")
-       (gui/on-mouse-clicked-with-view-context view-context
-                                               (fn [state event]
-                                                 (refresh state))))
-   (-> (button "Cancel")
-       (gui/on-mouse-clicked-with-view-context view-context
-                                               (fn [state event]
-                                                 (set-changes state []))))
-   (text (vec (:changes state)))))
+                (gui/call-view controls/scroll-panel
+                               :apartments-scroll-panel
+                               {:content (let [entities (data/get-apartment-entities (:conn state))]
+                                           (l/table 3
+                                                    (for [entity entities]
+                                                      [(-> (text (:apartments/address entity))
+                                                           (gui/on-mouse-clicked (fn [state event]
+                                                                                   (.browse (Desktop/getDesktop)
+                                                                                            (URI. (str lots/lot-url-base (:apartments/id entity))))
+                                                                                   state)))
+                                                       (attribute-editor view-context
+                                                                         state
+                                                                         (:db/id entity)
+                                                                         :apartments/comment)])))})
+                
+                (text (vec (:changes state))))))
 
 (defn root [db-uri]
   (fn [view-context]
