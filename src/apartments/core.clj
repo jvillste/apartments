@@ -142,26 +142,28 @@
 
 
 (defn get-etuovi-lot-ids [hickup]
-  (let [result-list-path (core/find-term {:class "results list"} hickup)
+  (let [result-list-path (find-term {:class "results list"} hickup)
         result-list (get-in hickup
                             (-> result-list-path
-                                (core/navigate 1 [21])))]
+                                (navigate 1 [21])))]
     (->> (map #(when (vector? %)
                  (-> % second :id))
               result-list)
          (filter identity))))
 
 (defn next-url [hickup]
-  (let [span-path (core/find-term "Seuraava" hickup)]
+  (let [span-path (find-term "Seuraava" hickup)]
     (get-in hickup
             (-> span-path
-                (core/navigate 2 [1 :href])))))
+                (navigate 2 [1 :href])))))
+
+(def etuovi-lot-query-url-base "http://www.etuovi.com/myytavat-tontit/")
 
 (defn get-all-etuovi-lot-ids [query-url]
   (loop [url query-url
          ids []]
     (Thread/sleep 1000)
-    (let [hickup (core/get-hickup (str query-url-base url))
+    (let [hickup (get-hickup (str etuovi-lot-query-url-base url))
           next-url (next-url hickup)
           ids (concat ids (get-etuovi-lot-ids hickup))]
       (if next-url

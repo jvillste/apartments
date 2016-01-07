@@ -120,7 +120,7 @@
                 (gui/call-view controls/scroll-panel
                                :apartments-scroll-panel
                                {:content (let [entities (data/get-apartment-entities (:conn state))]
-                                           (l/table 3
+                                           (l/table 1
                                                     (for [entity entities]
                                                       [(-> (text (:apartments/address entity))
                                                            (gui/on-mouse-clicked (fn [state event]
@@ -143,15 +143,16 @@
      
      :view #'root-view}))
 
-(defonce event-channel (atom nil))
+
+(trace/trace-ns 'flow-gl.gui.gui)
 
 (defn start []
-  (reset! event-channel (gui/start-control (root data/db-uri)))
-
-  #_(trace/with-trace
-      (trace/log "start")
-      (gui/start-control (root data/db-uri))))
+  (gui/start-redrawable-control (root data/db-uri))
 
 
-(when @event-channel
-  (gui/redraw-app @event-channel))
+  #_(reset! event-channel
+          (trace/with-trace
+            (gui/start-control (root data/db-uri)))))
+
+(gui/redraw-last-started-redrawable-control)
+

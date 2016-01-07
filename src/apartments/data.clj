@@ -22,17 +22,17 @@
 (def schema [(attribute :apartments/id :string :one :identity true)
              (attribute :apartments/first-seen :instant)
              (attribute :apartments/not-seen :instant)
-             (attribute :apartments/address :string)
+             (attribute :apartments/address :string :one :fulltext true)
              (attribute :apartments/area :long)
              (attribute :apartments/price :long)
-             (attribute :apartments/comment :string)])
+             (attribute :apartments/comment :string :one :fulltext true)])
 
 (def migrations {} #_{:add-comment
                       {:txes [[]]}})
 
 (def memory-db-uri "datomic:mem://apartments")
 
-(def db-uri "datomic:free://localhost:4334/apartments")
+(def db-uri "datomic:free://localhost:4334/apartments2")
 
 (defn migrate [db-uri migrations]
   (let [conn (d/connect db-uri)]
@@ -59,9 +59,15 @@
          [?entity :db/ident ?ident]
          [?entity :db/valueType ?valueTypeId]
          [?valueTypeId :db/ident ?valueType]]
+       db))
+
+(defn apartments-by-address [db search]
+  (d/q '[:find [?apartment ...]
+         :in $ ?search
+         :where
+         [(fulltext $ :apartments/address ?search) [[?apartment ?address]]]]
        db
-       attribute
-       value))
+       search))
 
 (defn entity-by-value [db attribute value]
   (d/q '[:find ?entity .
@@ -202,7 +208,8 @@
             (assoc data key (get raw-data raw-key)))
           {}
           (partition 2 keys)))
-#_(create-apartments-database db-uri)
+
+(create-apartments-database db-uri)
 
 #_(d/delete-database db-uri)
 
@@ -219,16 +226,30 @@
       (select-keys entity [:apartments/last-seen
                            :apartments/address])))
 
+
+#_(let [conn (d/connect db-uri)]
+    (apartments-by-address (d/db conn) "Halkoniemi"))
+
 #_(let [conn (d/connect db-uri)]
     (d/transact conn schema))
 
 #_(let [conn (d/connect db-uri)]
-    (db-attributes (d/db conn)))
+  (d/transact conn [{:db/id :apartments/address
+                     :db/fulltext true
+                     :db.alter/_attribute :db.part/db}])
+  #_(d/q '[:find ?ident ?valueType
+           :in $
+           :where
+           [?entity :db/ident ?ident]
+           [?entity :db/ident :apartments/address]
+           [?entity :db/valueType ?valueTypeId]
+           [?valueTypeId :db/ident ?valueType]]
+         (d/db conn)))
 
 #_(-> db-uri
-    d/connect
-    d/db
-    apartment-ids)
+      d/connect
+      d/db
+      apartment-ids)
 
 
 #_(migrate db-uri migrations)

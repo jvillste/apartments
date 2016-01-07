@@ -31,22 +31,25 @@
 
 
 (defn clean-number [value]
-  (->> (take-while #(re-find #"[0-9 ]" (str %)) value)
-       (filter #(not= \  %))
-       (apply str)
-       (read-string)
-       (int)))
+  (when value
+    (->> (take-while #(re-find #"[0-9 ]" (str %)) value)
+         (filter #(not= \  %))
+         (apply str)
+         (read-string)
+         (int))))
 
 (defn etuovi-raw-data-to-apartments-data [raw-data]
   (-> (data/raw-data-to-apartments-data raw-data
                                         :apartments/id "Kohdenumero:"
                                         :apartments/address "Sijainti:"
-                                        :apartments/area "Tontin pinta-ala:"
-                                        :apartments/price "Myyntihinta:")
-      (update-in [:apartments/area] clean-number)
-      (update-in [:apartments/price] clean-number)))
+                                        :apartments/area "Tontin pinta-ala:")
+      (assoc :apartments/price (-> (or (get raw-data "Myyntihinta:")
+                                       (get raw-data "Velaton lähtöhinta:"))
+                                   (clean-number)))
+      (update-in [:apartments/area] clean-number)))
 
 (defn get-lot-data [lot-id]
+  (println "get-lot-data" lot-id)
   (etuovi-raw-data-to-apartments-data (etuovi/get-lot-data (get-lot-hickup lot-id))))
 
 (defn set-new-apartments-data [apartment-data-map]
@@ -63,18 +66,19 @@
                   (apply hash-set current-ids)))
 
 
-(defn load-data [ids]
-  (->> ids
-       (map get-lot-data)
-       (map set-new-apartments-data)))
+(defn load-data [id]
+  (->> id
+       (get-lot-data)
+       (set-new-apartments-data)))
 
 (defn refresh-data [conn current-ids]
   (let [db (d/db conn)
         old-ids (data/apartment-ids db)]
-    (d/transact conn
-                (flatten
-                 (load-data (new-ids old-ids
-                                     current-ids))))))
+    (doseq [new-id (new-ids old-ids
+                            current-ids)]
+      (d/transact conn
+                  (flatten
+                   (load-data new-id))))))
 
 (defn mark-not-seen [ids]
   (map data/not-seen-now ids))
@@ -101,8 +105,12 @@
 
 #_(data/create-apartments-database db-uri)
 
-#_(let [conn (d/connect db-uri)]
-  (refresh-data conn (get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128&page=9")))
+#_(trace/trace-ns 'apartments.lots)
+
+#_(trace/with-trace
+  (let [conn (d/connect db-uri)]
+    (refresh-data conn (core/get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128"))))
+
 
 #_(let [conn (d/connect db-uri)]
     (refresh-data conn #{"7663526" "7663600"}))
