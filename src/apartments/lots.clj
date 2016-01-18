@@ -108,8 +108,8 @@
 #_(trace/trace-ns 'apartments.lots)
 
 #_(trace/with-trace
-  (let [conn (d/connect db-uri)]
-    (refresh-data conn (core/get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128"))))
+  (let [conn (d/connect data/db-uri)]
+    (refresh-data conn (core/get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M117523265"))))
 
 
 #_(let [conn (d/connect db-uri)]

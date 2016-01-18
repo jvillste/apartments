@@ -5,6 +5,7 @@
                          [layout-dsl :as l]
                          [controls :as controls]
                          [gui :as gui]
+                         [transformers :as transformers]
                          [events :as events]
                          [layoutable :as layoutable]
                          [transformer :as transformer])
@@ -92,8 +93,25 @@
   (let [margin 5]
     (l/margin margin margin margin margin content)))
 
+(defn table-view [view-context state]
+  (-> (let [entities (data/get-apartment-entities (:db state))]
+        (l/table 1
+                 (for [entity (take 40 entities)]
+                   [(-> (text (:apartments/address entity))
+                        (gui/on-mouse-clicked (fn [state event]
+                                                (.browse (Desktop/getDesktop)
+                                                         (URI. (str lots/lot-url-base (:apartments/id entity))))
+                                                state)))
+                    (attribute-editor (:root-view-context state)
+                                      state
+                                      (:db/id entity)
+                                      :apartments/comment)])))
+      (assoc :transformer (assoc transformers/cache
+                                 :id :cache))))
 
-
+(defn table [view-context]
+  {:local-state {}   
+   :view #'table-view})
 
 (defn root-view [view-context state]
   (l/float-top (l/horizontally (-> (button "Save")
@@ -119,18 +137,9 @@
 
                 (gui/call-view controls/scroll-panel
                                :apartments-scroll-panel
-                               {:content (let [entities (data/get-apartment-entities (:conn state))]
-                                           (l/table 1
-                                                    (for [entity entities]
-                                                      [(-> (text (:apartments/address entity))
-                                                           (gui/on-mouse-clicked (fn [state event]
-                                                                                   (.browse (Desktop/getDesktop)
-                                                                                            (URI. (str lots/lot-url-base (:apartments/id entity))))
-                                                                                   state)))
-                                                       (attribute-editor view-context
-                                                                         state
-                                                                         (:db/id entity)
-                                                                         :apartments/comment)])))})
+                               {:content (gui/call-view table
+                                                        :table (assoc (select-keys state [:db :db-with-changes])
+                                                                      :root-view-context view-context))})
                 
                 (text (vec (:changes state))))))
 
@@ -147,12 +156,36 @@
 (trace/trace-ns 'flow-gl.gui.gui)
 
 (defn start []
-  (gui/start-redrawable-control (root data/db-uri))
+  #_(gui/start-redrawable-control (root data/db-uri))
 
-
-  #_(reset! event-channel
-          (trace/with-trace
-            (gui/start-control (root data/db-uri)))))
+  (trace/with-trace
+    (gui/start-control (root data/db-uri))))
 
 (gui/redraw-last-started-redrawable-control)
+
+(comment
+  (defn foo []
+    (foo))
+
+  (defn stack-frame-to-map [stack-frame]
+    {:method-name (.getMethodName stack-frame)
+     :class-name (.getClassName stack-frame)
+     :file-name (.getFileName stack-frame)
+     :line-number (.getLineNumber stack-frame)})
+
+  (defn bar []
+    (throw (Exception. "FAIL!"))  )
+
+  #_(stack-frame-to-map stack-frame)
+
+  (try
+    (foo)
+    #_(throw (Exception. "FAIL!"))
+    (catch Throwable e
+      (def stack-trace (.getStackTrace e))
+      #_(def stack-frame (first  (.getStackTrace e)))
+      #_(println (stack-frame-to-map (last (.getStackTrace e)))))))
+
+
+
 

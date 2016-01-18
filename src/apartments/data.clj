@@ -197,10 +197,9 @@
   (d/delete-database db-uri) 
   (create-apartments-database db-uri))
 
-(defn get-apartment-entities [conn]
-  (let [db (d/db conn)]
-    (map #(d/entity db %)
-         (apartment-entity-ids db))))
+(defn get-apartment-entities [db]
+  (map #(d/entity db %)
+       (apartment-entity-ids db)))
 
 
 (defn raw-data-to-apartments-data [raw-data & keys]
@@ -209,7 +208,7 @@
           {}
           (partition 2 keys)))
 
-(create-apartments-database db-uri)
+#_(create-apartments-database db-uri)
 
 #_(d/delete-database db-uri)
 
@@ -228,23 +227,23 @@
 
 
 #_(let [conn (d/connect db-uri)]
-    (apartments-by-address (d/db conn) "Halkoniemi"))
+    (apartments-by-address (d/db conn) "Vaaksiaisentie"))
 
 #_(let [conn (d/connect db-uri)]
     (d/transact conn schema))
 
 #_(let [conn (d/connect db-uri)]
-  (d/transact conn [{:db/id :apartments/address
-                     :db/fulltext true
-                     :db.alter/_attribute :db.part/db}])
-  #_(d/q '[:find ?ident ?valueType
-           :in $
-           :where
-           [?entity :db/ident ?ident]
-           [?entity :db/ident :apartments/address]
-           [?entity :db/valueType ?valueTypeId]
-           [?valueTypeId :db/ident ?valueType]]
-         (d/db conn)))
+    (d/transact conn [{:db/id :apartments/address
+                       :db/fulltext true
+                       :db.alter/_attribute :db.part/db}])
+    #_(d/q '[:find ?ident ?valueType
+             :in $
+             :where
+             [?entity :db/ident ?ident]
+             [?entity :db/ident :apartments/address]
+             [?entity :db/valueType ?valueTypeId]
+             [?valueTypeId :db/ident ?valueType]]
+           (d/db conn)))
 
 #_(-> db-uri
       d/connect
