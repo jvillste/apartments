@@ -4,31 +4,30 @@
                         [etuovi :as etuovi])
             [clojure.string :as string]
             [datomic.api :as d]
-            [clojure.set :as set]
-            [flow-gl.tools.trace :as trace])
-  (:use [clojure.test]))
+            [clojure.set :as set])
+  #_(:use [clojure.test]))
+
+#_(lots [{:address "Vaakatie 13"
+          :comment "liian lahella rajatorpan tieta"}])
 
 (def test-query "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M100905128&page=9")
 
 (def query-url-base "http://www.etuovi.com/myytavat-tontit/")
 (def query-url "tulokset?haku=M100905128")
+(def lots-query-url "tulokset?haku=M132770175")
 
 (def lot-url-base "http://www.etuovi.com/kohde/")
 
-(defonce hickup (core/get-hickup "http://www.etuovi.com/kohde/1165909"))
+#_(defonce hickup (core/get-hickup "http://www.etuovi.com/kohde/1165909"))
 
 (defn get-lot-hickup [id]
   (core/get-hickup (str lot-url-base id)))
-
 
 (defn get-etuovi-address [hickup]
   (let [path (core/find-term [:dt {} "Sijainti:"] hickup)]
     (get-in hickup
             (-> path
                 (core/navigate 1 [9 3 5 2 2])))))
-
-
-
 
 (defn clean-number [value]
   (when value
@@ -47,7 +46,6 @@
                                        (get raw-data "Velaton lähtöhinta:"))
                                    (clean-number)))
       (update-in [:apartments/area] clean-number)))
-
 (defn get-lot-data [lot-id]
   (println "get-lot-data" lot-id)
   (etuovi-raw-data-to-apartments-data (etuovi/get-lot-data (get-lot-hickup lot-id))))
@@ -76,6 +74,7 @@
         old-ids (data/apartment-ids db)]
     (doseq [new-id (new-ids old-ids
                             current-ids)]
+      #_(trace/log "new" new-id)
       (d/transact conn
                   (flatten
                    (load-data new-id))))))
@@ -108,8 +107,8 @@
 #_(trace/trace-ns 'apartments.lots)
 
 #_(trace/with-trace
-  (let [conn (d/connect data/db-uri)]
-    (refresh-data conn (core/get-all-etuovi-lot-ids "http://www.etuovi.com/myytavat-tontit/tulokset?haku=M117523265"))))
+    (let [conn (d/connect data/db-uri)]
+      (refresh-data conn (core/get-all-etuovi-lot-ids "tulokset?haku=M132770175"))))
 
 
 #_(let [conn (d/connect db-uri)]
@@ -134,3 +133,5 @@
 
 #_(let [conn (d/connect db-uri)]
     (data/apartment-ids (d/db conn)))
+
+

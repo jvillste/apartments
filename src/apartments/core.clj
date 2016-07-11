@@ -1,8 +1,7 @@
 (ns apartments.core
-  
   (:require [clojure.core.async :as async]
-            [flow-gl.csp :as csp]
-            (flow-gl.gui [drawable :as drawable]
+            #_[flow-gl.csp :as csp]
+            #_(flow-gl.gui [drawable :as drawable]
                          [layout :as layout]
                          [layouts :as layouts]
                          [layout-dsl :as l]
@@ -11,10 +10,10 @@
                          [events :as events]
                          [layoutable :as layoutable]
                          [transformer :as transformer])
-            (flow-gl.graphics [font :as font])
+            #_(flow-gl.graphics [font :as font])
             [clj-http.client :as http]
             [hickory.core :as hickory]
-            [flow-gl.tools.trace :as trace])
+            #_[flow-gl.tools.trace :as trace])
   (:import [java.awt Desktop]
            [java.net URI])
   (:use [clojure.test]))
